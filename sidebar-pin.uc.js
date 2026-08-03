@@ -40,6 +40,7 @@
     let pendingRelease = false;
 
     const releaseWhenSafe = () => {
+	console.log("releaseWhenSafe, hovering:", toolbox.matches(":hover"), "pending:", pendingRelease);
       if (pendingRelease) return;
       if (toolbox.matches(":hover")) {
         pendingRelease = true;
