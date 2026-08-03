@@ -76,7 +76,7 @@
     "type": "checkbox",
     "disabledOn": [],
     "defaultValue": true
-  }
+  },
   {
     "property": "mod.ccs.pin_sidebar",
     "label": "Pin sidebar (always visible)",
