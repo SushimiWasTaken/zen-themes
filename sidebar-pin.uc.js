@@ -100,11 +100,16 @@
       attributes: true,
       attributeFilter: ["zen-has-hover", "zen-user-show"],
     });
-    Services.prefs.addObserver(PREF, () => {
+    const prefObserver = () => {
       updateIcon();
       if (isPinned()) keepShown();
       else releaseWhenSafe();
-    });
+    };
+    Services.prefs.addObserver(PREF, prefObserver);
+    window.addEventListener("unload", () => {
+      Services.prefs.removeObserver(PREF, prefObserver);
+      observer.disconnect();
+    }, { once: true });
   }
   if (document.readyState === "complete") init();
   else window.addEventListener("load", init, { once: true });
