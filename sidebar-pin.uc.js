@@ -1,16 +1,14 @@
 (function () {
   const PREF = "mod.ccs.pin_sidebar";
   const icons = {
-    pinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, white)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4a1 1 0 0 1 1 1z"/></svg>`,
-    unpinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, white)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5m3-12.66V7a1 1 0 0 1 1-1a2 2 0 0 0 0-4H7.89M2 2l20 20M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></svg>`,
+    pinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, white)" 	stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5m3-12.66V7a1 1 0 0 1 1-1a2 2 0 0 0 0-4H7.89M2 2l20 	20M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></svg>`,
+    unpinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, 	white)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 	0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1a2 2 0 0 0 	0-4H8a2 2 0 0 0 0 4a1 1 0 0 1 1 1z"/></svg>`,
   };
   const svgToUrl = (svg) =>
     "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-
   function init() {
     const toolbox = document.getElementById("navigator-toolbox");
     if (!toolbox) return;
-
     const isPinned = () => {
       try {
         return Services.prefs.getBoolPref(PREF, true);
@@ -18,7 +16,6 @@
         return true;
       }
     };
-
     const keepShown = () => {
       if (!isPinned()) return;
       if (toolbox.getAttribute("zen-has-hover") !== "true") {
@@ -28,18 +25,28 @@
         toolbox.setAttribute("zen-user-show", "true");
       }
     };
-
-    let suppressHoverRemoval = false;
-
     const release = () => {
       toolbox.removeAttribute("zen-user-show");
-      if (!suppressHoverRemoval) {
-        toolbox.removeAttribute("zen-has-hover");
+      toolbox.removeAttribute("zen-has-hover");
+    };
+    const releaseWhenSafe = () => {
+      // If the cursor is still over the sidebar, leave the attributes
+      // alone — removing zen-user-show now makes Zen play its collapse
+      // animation and then immediately re-show (the bounce). Defer the
+      // release until the mouse actually leaves.
+      if (toolbox.matches(":hover")) {
+        toolbox.addEventListener(
+          "mouseleave",
+          () => {
+            if (!isPinned()) release();
+          },
+          { once: true }
+        );
+      } else {
+        release();
       }
     };
-
     let button = null;
-
     const updateIcon = () => {
       if (!button) return;
       const icon = isPinned() ? icons.pinned : icons.unpinned;
@@ -49,13 +56,6 @@
         isPinned() ? "Unpin sidebar" : "Pin sidebar"
       );
     };
-
-    const updateIconTo = (pinned) => {
-      if (!button) return;
-      button.setAttribute("image", svgToUrl(pinned ? icons.pinned : icons.unpinned));
-      button.setAttribute("tooltiptext", pinned ? "Unpin sidebar" : "Pin sidebar");
-    };
-
     const addButton = () => {
       if (document.getElementById("ccs-pin-toggle")) return true;
       const target = document.getElementById("zen-sidebar-foot-buttons");
@@ -64,45 +64,30 @@
       button.id = "ccs-pin-toggle";
       button.className = "toolbarbutton-1 chromeclass-toolbar-additional";
       button.addEventListener("click", () => {
-        if (isPinned()) {
-          // Defer the unpin until the mouse leaves — no hide starts while hovering
-          toolbox.addEventListener(
-            "mouseleave",
-            () => Services.prefs.setBoolPref(PREF, false),
-            { once: true }
-          );
-          updateIconTo(false); // reflect the choice immediately in the icon
-        } else {
-          Services.prefs.setBoolPref(PREF, true);
-        }
+        Services.prefs.setBoolPref(PREF, !isPinned());
       });
       target.appendChild(button);
       updateIcon();
       return true;
     };
-
     if (!addButton()) {
       const retry = setInterval(() => {
         if (addButton()) clearInterval(retry);
       }, 300);
       setTimeout(() => clearInterval(retry), 15000);
     }
-
     keepShown();
-
     const observer = new MutationObserver(keepShown);
     observer.observe(toolbox, {
       attributes: true,
       attributeFilter: ["zen-has-hover", "zen-user-show"],
     });
-
     Services.prefs.addObserver(PREF, () => {
       updateIcon();
       if (isPinned()) keepShown();
-      else release();
+      else releaseWhenSafe();
     });
   }
-
   if (document.readyState === "complete") init();
   else window.addEventListener("load", init, { once: true });
 })();
