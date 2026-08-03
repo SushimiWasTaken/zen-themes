@@ -50,7 +50,8 @@
 
 	:root[zen-compact-mode="true"]:not([customizing]):not([inDOMFullscreen="true"]) {
 	    @media (-moz-bool-pref: "zen.view.compact.hide-tabbar") 
-			or (-moz-bool-pref: "zen.view.use-single-toolbar") {
+			or (-moz-bool-pref: "zen.view.use-single-toolbar") 
+			or (not (-moz-bool-pref: "zen.view.compact.hide-tabbar")) {
 			&:not([zen-compact-animating]) {
 				& #navigator-toolbox {
 					--zen-toolbox-max-width: var(--custom-sidebar-total-width) !important;
