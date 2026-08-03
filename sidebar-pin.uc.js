@@ -1,37 +1,16 @@
 (function () {
   const PREF = "mod.ccs.pin_sidebar";
-  const ATTR = "ccs-pinned";
   const SHORTCUT_KEY = "D";
   const SHORTCUT_MODIFIERS = "accel,shift";
   const icons = {
-    pinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, white)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4a1 1 0 0 1 1 1z"/></svg>`,
-    unpinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, white)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5m3-12.66V7a1 1 0 0 1 1-1a2 2 0 0 0 0-4H7.89M2 2l20 20M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></svg>`,
+    pinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, white)" 	stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5m3-12.66V7a1 1 0 0 1 1-1a2 2 0 0 0 0-4H7.89M2 2l20 	20M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></svg>`,
+    unpinned: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="context-fill light-dark(black, 	white)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 	0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1a2 2 0 0 0 	0-4H8a2 2 0 0 0 0 4a1 1 0 0 1 1 1z"/></svg>`,
   };
   const svgToUrl = (svg) =>
     "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   function init() {
     const toolbox = document.getElementById("navigator-toolbox");
     if (!toolbox) return;
-
-    // Inject CSS that neutralizes Zen's compact-mode hiding while pinned.
-    if (!document.getElementById("ccs-pin-style")) {
-      const style = document.createElementNS(
-        "http://www.w3.org/1999/xhtml",
-        "style"
-      );
-      style.id = "ccs-pin-style";
-      style.textContent = `
-        #navigator-toolbox[${ATTR}] {
-          margin-left: 0 !important;
-          margin-right: 0 !important;
-          transform: none !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-        }
-      `;
-      document.documentElement.appendChild(style);
-    }
-
     const isPinned = () => {
       try {
         return Services.prefs.getBoolPref(PREF, true);
@@ -39,31 +18,37 @@
         return true;
       }
     };
-
     const toggle = () => Services.prefs.setBoolPref(PREF, !isPinned());
-
-    const pin = () => toolbox.setAttribute(ATTR, "true");
-
-    let leaveArmed = false;
-    const unpin = () => {
-      // If the cursor is over the sidebar, keep the override until the
-      // mouse leaves, then let Zen collapse it once, normally.
+    const keepShown = () => {
+      if (!isPinned()) return;
+      if (toolbox.getAttribute("zen-has-hover") !== "true") {
+        toolbox.setAttribute("zen-has-hover", "true");
+      }
+      if (toolbox.getAttribute("zen-user-show") !== "true") {
+        toolbox.setAttribute("zen-user-show", "true");
+      }
+    };
+    const release = () => {
+      toolbox.removeAttribute("zen-user-show");
+      toolbox.removeAttribute("zen-has-hover");
+    };
+    const releaseWhenSafe = () => {
+      // If the cursor is still over the sidebar, leave the attributes
+      // alone — removing zen-user-show now makes Zen play its collapse
+      // animation and then immediately re-show (the bounce). Defer the
+      // release until the mouse actually leaves.
       if (toolbox.matches(":hover")) {
-        if (leaveArmed) return;
-        leaveArmed = true;
         toolbox.addEventListener(
           "mouseleave",
           () => {
-            leaveArmed = false;
-            if (!isPinned()) toolbox.removeAttribute(ATTR);
+            if (!isPinned()) release();
           },
           { once: true }
         );
       } else {
-        toolbox.removeAttribute(ATTR);
+        release();
       }
     };
-
     let button = null;
     const updateIcon = () => {
       if (!button) return;
@@ -74,7 +59,6 @@
         isPinned() ? "Unpin sidebar" : "Pin sidebar"
       );
     };
-
     const addButton = () => {
       if (document.getElementById("ccs-pin-toggle")) return true;
       const target = document.getElementById("zen-sidebar-foot-buttons");
@@ -87,7 +71,6 @@
       updateIcon();
       return true;
     };
-
     const addShortcut = () => {
       if (document.getElementById("ccs-pin-key")) return;
       const keyset =
@@ -104,22 +87,23 @@
       // is re-inserted; this forces the key map to rebuild.
       keyset.parentNode.appendChild(keyset);
     };
-
     if (!addButton()) {
       const retry = setInterval(() => {
         if (addButton()) clearInterval(retry);
       }, 300);
       setTimeout(() => clearInterval(retry), 15000);
     }
-
     addShortcut();
-
-    if (isPinned()) pin();
-
+    keepShown();
+    const observer = new MutationObserver(keepShown);
+    observer.observe(toolbox, {
+      attributes: true,
+      attributeFilter: ["zen-has-hover", "zen-user-show"],
+    });
     Services.prefs.addObserver(PREF, () => {
       updateIcon();
-      if (isPinned()) pin();
-      else unpin();
+      if (isPinned()) keepShown();
+      else releaseWhenSafe();
     });
   }
   if (document.readyState === "complete") init();
