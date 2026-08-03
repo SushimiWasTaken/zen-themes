@@ -39,16 +39,16 @@
       toolbox.removeAttribute("zen-user-show");
     };
 
+    let pendingRelease = false;
+
     const releaseWhenSafe = () => {
-      // If the cursor is still over the sidebar, leave the attributes
-      // alone — removing zen-user-show now makes Zen play its collapse
-      // animation and then immediately re-show (the bounce). Defer the
-      // release until the mouse actually leaves.
-      console.log("releaseWhenSafe, hovering:", toolbox.matches(":hover"));
+      if (pendingRelease) return;
       if (toolbox.matches(":hover")) {
+        pendingRelease = true;
         toolbox.addEventListener(
           "mouseleave",
           () => {
+            pendingRelease = false;
             if (!isPinned()) release();
           },
           { once: true }
