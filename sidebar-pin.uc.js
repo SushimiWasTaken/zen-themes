@@ -50,6 +50,12 @@
       );
     };
 
+    const updateIconTo = (pinned) => {
+      if (!button) return;
+      button.setAttribute("image", svgToUrl(pinned ? icons.pinned : icons.unpinned));
+      button.setAttribute("tooltiptext", pinned ? "Unpin sidebar" : "Pin sidebar");
+    };
+
     const addButton = () => {
       if (document.getElementById("ccs-pin-toggle")) return true;
       const target = document.getElementById("zen-sidebar-foot-buttons");
@@ -58,16 +64,17 @@
       button.id = "ccs-pin-toggle";
       button.className = "toolbarbutton-1 chromeclass-toolbar-additional";
       button.addEventListener("click", () => {
-        suppressHoverRemoval = true;
-        toolbox.addEventListener(
-          "mouseleave",
-          () => {
-            suppressHoverRemoval = false;
-            if (!isPinned()) toolbox.removeAttribute("zen-has-hover");
-          },
-          { once: true }
-        );
-        Services.prefs.setBoolPref(PREF, !isPinned());
+        if (isPinned()) {
+          // Defer the unpin until the mouse leaves — no hide starts while hovering
+          toolbox.addEventListener(
+            "mouseleave",
+            () => Services.prefs.setBoolPref(PREF, false),
+            { once: true }
+          );
+          updateIconTo(false); // reflect the choice immediately in the icon
+        } else {
+          Services.prefs.setBoolPref(PREF, true);
+        }
       });
       target.appendChild(button);
       updateIcon();
