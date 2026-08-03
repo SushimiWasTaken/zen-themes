@@ -33,17 +33,14 @@
       }
     };
 
-    const release = () => {
+    const release = ({ clearHover }) => {
       toolbox.removeAttribute("zen-user-show");
-      if (!toolbox.matches(":hover")) {
+      if (clearHover) {
         toolbox.removeAttribute("zen-has-hover");
       }
     };
 
-    let pendingRelease = false;
-
     const releaseWhenSafe = () => {
-	console.log("releaseWhenSafe, hovering:", toolbox.matches(":hover"), "pending:", pendingRelease);
       if (pendingRelease) return;
       if (toolbox.matches(":hover")) {
         pendingRelease = true;
@@ -51,12 +48,15 @@
           "mouseleave",
           () => {
             pendingRelease = false;
-            if (!isPinned()) release();
+            // Zen clears zen-has-hover itself on mouseleave — don't touch it.
+            if (!isPinned()) release({ clearHover: false });
           },
           { once: true }
         );
       } else {
-        release();
+        // Mouse was never over the sidebar (keyboard toggle) — nothing
+        // will fire mouseleave, so clear the hover flag ourselves.
+        release({ clearHover: true });
       }
     };
 
