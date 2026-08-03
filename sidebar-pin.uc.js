@@ -25,7 +25,6 @@
 
     const keepShown = () => {
       if (!isPinned()) return;
-      console.log("keepShown fired");
       if (toolbox.getAttribute("zen-has-hover") !== "true") {
         toolbox.setAttribute("zen-has-hover", "true");
       }
@@ -35,7 +34,6 @@
     };
 
     const release = () => {
-      console.log("release fired");
       toolbox.removeAttribute("zen-user-show");
     };
 
