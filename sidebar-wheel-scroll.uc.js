@@ -6,7 +6,7 @@
 (function () {
   const TAB_LIST_WINS_WHEN_OVERFLOWING = true;
   const EDGE_INSET = 4;
-  const DEBUG = true;
+  const DEBUG = false;
 
   let badge = null, lastLine = "-", under = "-";
 
