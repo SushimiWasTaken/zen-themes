@@ -10,9 +10,6 @@
   "scripts": {
     "sidebar-pin.uc.js": {
       "include": ["chrome://browser/content/browser.xhtml"]
-    },
-    "autoscroll-cursor.uc.js": {
-      "include": ["chrome://browser/content/browser.xhtml"]
     }
   }
 }
