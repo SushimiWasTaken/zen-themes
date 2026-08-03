@@ -1,14 +1,17 @@
 // ==UserScript==
-// @name           Scroll with context menu open
-// @description    Context menu acts as a fence: page scrolls around it, nothing scrolls under it
+// @name           Close popup on scroll
+// @description    Wheeling while a popup is open dismisses it, like clicking away
 // ==/UserScript==
 
 (function () {
+  // Which popups this applies to. Add ids, or set MATCH_ALL_MENUS to catch
+  // every menupopup (tab context menu, bookmarks, etc).
   const MENU_IDS = ["contentAreaContextMenu"];
-  const CLOSE_ON_SCROLL = false;
+  const MATCH_ALL_MENUS = false;
+  const IGNORE_OVER_MENU = true;   // wheeling on the menu itself scrolls it, doesn't close
   const DEBUG = true;
 
-  const patched = new Set();
+  const open = new Set();
   let badge = null;
 
   function log(msg) {
@@ -21,70 +24,51 @@
         "pointer-events:none;white-space:pre";
       document.documentElement.appendChild(badge);
     }
-    badge.textContent = `open: ${patched.size}\n${msg}`;
+    badge.textContent = `open: ${open.size}\n${msg}`;
   }
 
-  const isTarget = (p) => p?.tagName === "menupopup" && MENU_IDS.includes(p.id);
+  const isTarget = (p) =>
+    p?.tagName === "menupopup" && (MATCH_ALL_MENUS || MENU_IDS.includes(p.id));
+
   const inMenu = (node) => !!node?.closest?.("menupopup");
 
-  function hideAll() {
-    for (const p of [...patched]) {
+  function closeAll() {
+    for (const p of [...open]) {
       try { p.hidePopup(); } catch (e) {}
     }
   }
 
   function onWheel(e) {
-    if (!patched.size) return;
-
-    // Inside the fence: swallow it. The menu's scrollbox doesn't scroll and
-    // nothing is forwarded to the page.
-    if (inMenu(e.composedTarget || e.target)) {
-      e.preventDefault();
-      e.stopPropagation();
-      log("inside fence (blocked)");
+    if (!open.size) return;
+    if (IGNORE_OVER_MENU && inMenu(e.composedTarget || e.target)) {
+      log("over menu (left alone)");
       return;
     }
-
-    // Outside the fence: leave it alone, the page scrolls natively.
-    log(`outside fence (dy ${Math.round(e.deltaY)})`);
-    if (CLOSE_ON_SCROLL) hideAll();
-  }
-
-  function onMouseDown(e) {
-    if (inMenu(e.composedTarget || e.target)) return;
-    log("dismiss: outside click");
-    hideAll();
-  }
-
-  function onKeyDown(e) {
-    if (e.key === "Escape") { log("dismiss: escape"); hideAll(); }
+    log(`closing (dy ${Math.round(e.deltaY)})`);
+    closeAll();
   }
 
   function addGuards() {
-    window.addEventListener("mousedown", onMouseDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    window.addEventListener("wheel", onWheel, { capture: true, passive: true });
+    window.addEventListener("DOMMouseScroll", onWheel, { capture: true, passive: true });
   }
 
   function removeGuards() {
-    window.removeEventListener("mousedown", onMouseDown, true);
-    window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("wheel", onWheel, true);
+    window.removeEventListener("DOMMouseScroll", onWheel, true);
   }
 
   function init() {
-    document.addEventListener("popupshowing", (e) => {
+    document.addEventListener("popupshown", (e) => {
       if (!isTarget(e.target)) return;
-      e.target.setAttribute("noautohide", "true");
-      patched.add(e.target);
-      if (patched.size === 1) addGuards();
-      log("menu opened (noautohide)");
+      open.add(e.target);
+      if (open.size === 1) addGuards();
+      log("menu opened");
     }, true);
 
     document.addEventListener("popuphidden", (e) => {
-      if (!patched.delete(e.target)) return;
-      e.target.removeAttribute("noautohide");
-      if (!patched.size) removeGuards();
+      if (!open.delete(e.target)) return;
+      if (!open.size) removeGuards();
       log("menu closed");
     }, true);
 
