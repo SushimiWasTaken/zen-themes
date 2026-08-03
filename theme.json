@@ -13,9 +13,6 @@
     },
     "sidebar-wheel-scroll.uc.js": {
       "include": ["chrome://browser/content/browser.xhtml"]
-    },
-    "contextmenu-scroll.uc.js": {
-      "include": ["chrome://browser/content/browser.xhtml"]
     }
   }
 }
