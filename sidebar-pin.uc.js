@@ -29,9 +29,11 @@
       }
     };
 
+    let suppressHoverRemoval = false;
+
     const release = () => {
       toolbox.removeAttribute("zen-user-show");
-      if (!toolbox.matches(":hover")) {
+      if (!suppressHoverRemoval) {
         toolbox.removeAttribute("zen-has-hover");
       }
     };
@@ -56,6 +58,15 @@
       button.id = "ccs-pin-toggle";
       button.className = "toolbarbutton-1 chromeclass-toolbar-additional";
       button.addEventListener("click", () => {
+        suppressHoverRemoval = true;
+        toolbox.addEventListener(
+          "mouseleave",
+          () => {
+            suppressHoverRemoval = false;
+            if (!isPinned()) toolbox.removeAttribute("zen-has-hover");
+          },
+          { once: true }
+        );
         Services.prefs.setBoolPref(PREF, !isPinned());
       });
       target.appendChild(button);
