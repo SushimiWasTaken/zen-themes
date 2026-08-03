@@ -5,10 +5,13 @@
   "style": "https://raw.githubusercontent.com/SushimiWasTaken/zen-themes/main/chrome.css",
   "readme": "https://raw.githubusercontent.com/SushimiWasTaken/zen-themes/main/readme.md",
   "preferences": "https://raw.githubusercontent.com/SushimiWasTaken/zen-themes/main/preferences.json",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "fork": ["zen"],
   "scripts": {
     "sidebar-pin.uc.js": {
+      "include": ["chrome://browser/content/browser.xhtml"]
+    },
+    "autoscroll-cursor.uc.js": {
       "include": ["chrome://browser/content/browser.xhtml"]
     }
   }
