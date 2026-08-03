@@ -135,6 +135,7 @@
     const prefObserver = () => {
       updateIcon();
       if (isPinned()) {
+        pendingRelease = false;
         startObserving();
         keepShown();
       } else {
