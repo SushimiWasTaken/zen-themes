@@ -1,16 +1,19 @@
 // ==UserScript==
 // @name           Sidebar wheel scrolls page
-// @description    Wheeling over the sidebar scrolls the active tab's page
+// @description    Wheel over the sidebar (or with a menu open) scrolls the page
 // ==/UserScript==
 
 (function () {
   const TAB_LIST_WINS_WHEN_OVERFLOWING = true;
-  const EDGE_INSET = 2;   // px inside the content edge we clamp to
+  const SCROLL_WITH_MENU_OPEN = true;
+  const CLOSE_MENU_ON_SCROLL = false;  // flip if the menu hanging around looks wrong
+  const EDGE_INSET = 2;
   const DEBUG = true;
 
-  let badge = null;
+  const openMenus = new Set();
+  let seen = 0, forwarded = 0, badge = null;
 
-  function log(msg) {
+  function log(extra) {
     if (!DEBUG) return;
     if (!badge) {
       badge = document.createElement("div");
@@ -20,7 +23,10 @@
         "pointer-events:none;white-space:pre";
       document.documentElement.appendChild(badge);
     }
-    badge.textContent = msg;
+    badge.textContent =
+      `menus open: ${openMenus.size}\n` +
+      `wheel seen: ${seen}\n` +
+      `forwarded:  ${forwarded}\n` + extra;
   }
 
   function scrollableAncestor(node) {
@@ -35,51 +41,71 @@
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-  function onWheel(e) {
+  function forward(e, reason) {
     const browser = gBrowser?.selectedBrowser;
     if (!browser) return;
-
-    if (TAB_LIST_WINS_WHEN_OVERFLOWING) {
-      const scrollable = scrollableAncestor(e.composedTarget || e.target);
-      if (scrollable) {
-        log(`forwarded: no\nreason:    tab list scrollable`);
-        return;
-      }
-    }
 
     e.preventDefault();
     e.stopPropagation();
 
-    // Project the real cursor position onto the nearest point inside the
-    // content area — i.e. where the pointer would be if the sidebar
-    // weren't occupying that space. Keeps the cursor's y exactly, and
-    // works for a left- or right-hand sidebar without special-casing.
     const r = browser.getBoundingClientRect();
     const x = clamp(e.clientX, r.left + EDGE_INSET, r.right - EDGE_INSET);
     const y = clamp(e.clientY, r.top + EDGE_INSET, r.bottom - EDGE_INSET);
 
     try {
       window.windowUtils.sendWheelEvent(
-        x, y,
-        e.deltaX, e.deltaY, e.deltaZ,
-        e.deltaMode,
-        0,
-        Math.round(e.deltaX),
-        Math.round(e.deltaY),
-        0
+        x, y, e.deltaX, e.deltaY, e.deltaZ, e.deltaMode, 0,
+        Math.round(e.deltaX), Math.round(e.deltaY), 0
       );
-      log(`forwarded: yes\ndeltaY:    ${Math.round(e.deltaY)}\ncursor:    ${Math.round(e.clientX)},${Math.round(e.clientY)}\naimed at:  ${Math.round(x)},${Math.round(y)}`);
+      forwarded++;
+      log(`reason:     ${reason}\naimed at:   ${Math.round(x)},${Math.round(y)}`);
     } catch (err) {
-      log(`forwarded: FAILED\nerror:     ${err}`);
+      log(`reason:     ${reason}\nERROR:      ${err}`);
+    }
+  }
+
+  function onWheel(e) {
+    seen++;
+    const target = e.composedTarget || e.target;
+
+    // Pointer over an open menu: let the menu scroll itself.
+    if (target?.closest?.("menupopup, panel")) {
+      log(`reason:     over menu (ignored)`);
+      return;
+    }
+
+    if (SCROLL_WITH_MENU_OPEN && openMenus.size) {
+      if (CLOSE_MENU_ON_SCROLL) {
+        for (const m of [...openMenus]) m.hidePopup();
+        log(`reason:     menu closed on scroll`);
+        return;   // let the native scroll happen once the menu is gone
+      }
+      forward(e, "menu open");
+      return;
+    }
+
+    // Pointer over the sidebar / toolbox.
+    if (target?.closest?.("#navigator-toolbox")) {
+      if (TAB_LIST_WINS_WHEN_OVERFLOWING && scrollableAncestor(target)) {
+        log(`reason:     tab list scrollable (ignored)`);
+        return;
+      }
+      forward(e, "sidebar");
     }
   }
 
   function init() {
-    const toolbox = document.getElementById("navigator-toolbox");
-    if (!toolbox) return;
-    toolbox.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    document.addEventListener("popupshown", (e) => {
+      if (e.target.tagName === "menupopup") { openMenus.add(e.target); log("reason:     -"); }
+    }, true);
+
+    document.addEventListener("popuphidden", (e) => {
+      if (openMenus.delete(e.target)) log("reason:     -");
+    }, true);
+
+    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
     window.addEventListener("unload", () => {
-      toolbox.removeEventListener("wheel", onWheel, { capture: true });
+      window.removeEventListener("wheel", onWheel, { capture: true });
     }, { once: true });
   }
 
