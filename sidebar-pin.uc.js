@@ -37,8 +37,7 @@
     };
 
     // --- Pin button ---
-    const target = document.getElementById(
-      "zen-sidebar-top-buttons-customization-target"
+    const target = document.querySelector(".zen-workspace-tabs-section");
     );
 
     let button = null;
