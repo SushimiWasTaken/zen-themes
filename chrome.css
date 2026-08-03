@@ -96,14 +96,13 @@
 		        	}
 		        }
 
-		        @media (-moz-bool-pref: "zen.view.compact.hide-toolbar") {
-			        &:not([zen-single-toolbar="true"]) {
-			        	& #navigator-toolbox:not([animate="true"]) {
-			        		top: var(--custom-sidebar-compact-top-margin) !important;
-			        		bottom: var(--custom-sidebar-compact-bottom-margin) !important;
-			        	}
-			        }
-			    }
+		        &:not([zen-single-toolbar="true"]) {
+		        	& #navigator-toolbox:not([animate="true"]) {
+		        		top: var(--custom-sidebar-compact-top-margin) !important;
+		        		bottom: var(--custom-sidebar-compact-bottom-margin) !important;
+		        		margin-top: 0 !important;
+		        	}
+		        }
 			}
 		}
 	}
