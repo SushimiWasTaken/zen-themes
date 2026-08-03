@@ -1,26 +1,36 @@
 // ==UserScript==
-// @name           Autoscroll direction cursor (DEBUG)
-// @description    Instrumented build - reports autoscroll event state on screen
+// @name           Autoscroll direction cursor (DEBUG 2)
+// @description    Distinct test cursors + multiple apply targets
 // ==/UserScript==
 
 (function () {
   const DEAD_ZONE = 10;
 
-  let panel = null;
-  let anchorY = 0;
-  let moveCount = 0;
-  let lastDy = 0;
-  let detectedVia = "-";
+  // Deliberately unmistakable while testing:
+  const CURSOR_UP   = "crosshair";
+  const CURSOR_DOWN = "wait";
+  const CURSOR_DEAD = "help";
+
+  let panel = null, anchorY = 0, moveCount = 0, lastDy = 0, applied = "-";
   let badge = null;
+
+  function targets() {
+    return [
+      document.documentElement,
+      panel,
+      document.getElementById("tabbrowser-tabpanels"),
+      document.getElementById("browser"),
+      gBrowser?.selectedBrowser,
+      gBrowser?.selectedBrowser?.closest(".browserStack"),
+    ].filter(Boolean);
+  }
 
   function makeBadge() {
     badge = document.createElement("div");
-    badge.id = "ccs-autoscroll-debug";
     badge.style.cssText = [
-      "position:fixed", "top:8px", "left:8px", "z-index:2147483647",
-      "background:rgba(0,0,0,.8)", "color:#0f0", "font:12px monospace",
-      "padding:6px 8px", "border-radius:6px", "pointer-events:none",
-      "white-space:pre",
+      "position:fixed","top:8px","left:8px","z-index:2147483647",
+      "background:rgba(0,0,0,.8)","color:#0f0","font:12px monospace",
+      "padding:6px 8px","border-radius:6px","pointer-events:none","white-space:pre",
     ].join(";");
     document.documentElement.appendChild(badge);
     render();
@@ -29,15 +39,16 @@
   function render() {
     if (!badge) return;
     badge.textContent =
-      `script: LOADED\n` +
-      `panel:  ${panel ? "OPEN" : "closed"}\n` +
-      `via:    ${detectedVia}\n` +
-      `moves:  ${moveCount}\n` +
-      `dy:     ${lastDy}`;
+      `panel:   ${panel ? "OPEN" : "closed"}\n` +
+      `moves:   ${moveCount}\n` +
+      `dy:      ${lastDy}\n` +
+      `applied: ${applied}\n` +
+      `targets: ${targets().length}`;
   }
 
   function setCursor(value) {
-    for (const t of [document.documentElement, panel].filter(Boolean)) {
+    applied = value || "-";
+    for (const t of targets()) {
       if (value) t.style.setProperty("cursor", value, "important");
       else t.style.removeProperty("cursor");
     }
@@ -47,60 +58,38 @@
     moveCount++;
     lastDy = e.screenY - anchorY;
     setCursor(
-      lastDy < -DEAD_ZONE ? "n-resize" :
-      lastDy >  DEAD_ZONE ? "s-resize" : "ns-resize"
+      lastDy < -DEAD_ZONE ? CURSOR_UP :
+      lastDy >  DEAD_ZONE ? CURSOR_DOWN : CURSOR_DEAD
     );
     render();
   }
 
-  function attach(p, via) {
+  function attach(p) {
     if (panel) return;
     panel = p;
-    detectedVia = via;
-    moveCount = 0;
-    lastDy = 0;
+    moveCount = 0; lastDy = 0;
     anchorY = p.screenY + p.getBoundingClientRect().height / 2;
-    setCursor("ns-resize");
+    setCursor(CURSOR_DEAD);
     window.addEventListener("mousemove", onMove, true);
-    p.addEventListener("mousemove", onMove, true);
     render();
   }
 
   function detach() {
     if (!panel) return;
     window.removeEventListener("mousemove", onMove, true);
-    panel.removeEventListener("mousemove", onMove, true);
     setCursor("");
     panel = null;
     render();
   }
 
-  function isAutoscroller(el) {
-    return el && (el.id === "autoscroller" || el.classList?.contains("autoscroller"));
-  }
-
   function init() {
     makeBadge();
-
     document.addEventListener("popupshown", (e) => {
-      if (isAutoscroller(e.target)) attach(e.target, "popupshown");
+      if (e.target.id === "autoscroller") attach(e.target);
     }, true);
-
     document.addEventListener("popuphidden", (e) => {
-      if (isAutoscroller(e.target)) detach();
+      if (e.target.id === "autoscroller") detach();
     }, true);
-
-    // Fallback: catch the panel being appended, in case popupshown never fires
-    new MutationObserver((records) => {
-      for (const r of records) {
-        for (const n of r.addedNodes) {
-          if (isAutoscroller(n)) setTimeout(() => attach(n, "mutation"), 0);
-        }
-        for (const n of r.removedNodes) {
-          if (isAutoscroller(n)) detach();
-        }
-      }
-    }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
   if (document.readyState === "complete") init();
