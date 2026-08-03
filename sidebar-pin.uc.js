@@ -37,7 +37,6 @@
     const release = () => {
       console.log("release fired");
       toolbox.removeAttribute("zen-user-show");
-      toolbox.removeAttribute("zen-has-hover");
     };
 
     const releaseWhenSafe = () => {
