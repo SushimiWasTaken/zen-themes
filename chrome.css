@@ -58,9 +58,9 @@
 					--zen-toolbar-height: calc(100% - var(--custom-sidebar-compact-height)) !important;
                     
 					&:not([animate="true"]) {
-						:root:not([zen-single-toolbar="true"]) & {
-							height: calc(100% - var(--custom-sidebar-compact-height)) !important;
-						}
+    						:root:not([zen-single-toolbar="true"]) & {
+        						height: auto !important;
+    						}
 					}
 				}
 
