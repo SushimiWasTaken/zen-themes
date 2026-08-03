@@ -1,20 +1,18 @@
 // ==UserScript==
 // @name           Sidebar wheel scrolls page
-// @description    Wheel over the sidebar scrolls the page (+ menu probe)
+// @description    Wheeling over the sidebar scrolls the active tab's page
 // ==/UserScript==
 
 (function () {
   const TAB_LIST_WINS_WHEN_OVERFLOWING = true;
   const EDGE_INSET = 4;
-  const DEBUG = false;
+  const DEBUG = true;
 
-  const openMenus = new Set();
-  const hits = { toolbox: 0, sent: 0, winWheel: 0, winLegacy: 0, popup: 0, popupLegacy: 0 };
   let badge = null, lastLine = "-", under = "-";
 
-  function log(extra) {
+  function log(msg) {
     if (!DEBUG) return;
-    if (extra !== undefined) lastLine = extra;
+    if (msg !== undefined) lastLine = msg;
     if (!badge) {
       badge = document.createElement("div");
       badge.style.cssText =
@@ -23,14 +21,7 @@
         "pointer-events:none;white-space:pre";
       document.documentElement.appendChild(badge);
     }
-    badge.textContent =
-      `toolbox hit:  ${hits.toolbox}\n` +
-      `sent:         ${hits.sent}\n` +
-      `under aim:    ${under}\n` +
-      `menus open:   ${openMenus.size}\n` +
-      `win wheel:    ${hits.winWheel}   legacy: ${hits.winLegacy}\n` +
-      `popup wheel:  ${hits.popup}   legacy: ${hits.popupLegacy}\n` +
-      `${lastLine}`;
+    badge.textContent = `under aim: ${under}\n${lastLine}`;
   }
 
   function scrollableAncestor(node) {
@@ -45,16 +36,17 @@
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-  // Cursor position projected into the content area, then pushed clear of
-  // the toolbox if the toolbox floats over that spot.
   function aimPoint(e, browser) {
     const r = browser.getBoundingClientRect();
     const t = document.getElementById("navigator-toolbox")?.getBoundingClientRect();
 
-    let x = clamp(e.clientX, r.left + EDGE_INSET, r.right - EDGE_INSET);
     const y = clamp(e.clientY, r.top + EDGE_INSET, r.bottom - EDGE_INSET);
+    let x = clamp(e.clientX, r.left + EDGE_INSET, r.right - EDGE_INSET);
 
-    if (t && x >= t.left && x <= t.right && y >= t.top && y <= t.bottom) {
+    // The pointer is in the sidebar, so unconditionally move the aim point
+    // past the sidebar's far edge — clamping alone leaves it inside the
+    // sidebar when the cursor is near that edge.
+    if (t) {
       const sidebarOnLeft = t.left - r.left <= r.right - t.right;
       x = sidebarOnLeft ? t.right + EDGE_INSET : t.left - EDGE_INSET;
       x = clamp(x, r.left + EDGE_INSET, r.right - EDGE_INSET);
@@ -62,15 +54,20 @@
     return { x, y };
   }
 
-  function forward(e, reason) {
+  function onToolboxWheel(e) {
     const browser = gBrowser?.selectedBrowser;
     if (!browser) return;
+
+    const target = e.composedTarget || e.target;
+    if (TAB_LIST_WINS_WHEN_OVERFLOWING && scrollableAncestor(target)) {
+      log("tab list scrollable (ignored)");
+      return;
+    }
 
     e.preventDefault();
     e.stopPropagation();
 
     const { x, y } = aimPoint(e, browser);
-
     const el = document.elementFromPoint(x, y);
     under = el ? (el.id || el.localName || "?") : "null";
 
@@ -79,45 +76,20 @@
         x, y, e.deltaX, e.deltaY, e.deltaZ, e.deltaMode, 0,
         Math.round(e.deltaX), Math.round(e.deltaY), 0
       );
-      hits.sent++;
-      log(`${reason} -> ${Math.round(x)},${Math.round(y)}`);
+      log(`sidebar -> ${Math.round(x)},${Math.round(y)}`);
     } catch (err) {
       log(`ERROR: ${err}`);
     }
   }
 
-  function onToolboxWheel(e) {
-    hits.toolbox++;
-    const target = e.composedTarget || e.target;
-    if (TAB_LIST_WINS_WHEN_OVERFLOWING && scrollableAncestor(target)) {
-      log("tab list scrollable (ignored)");
-      return;
-    }
-    forward(e, "sidebar");
-  }
-
-  const probe = (k) => () => { hits[k]++; log(); };
-
   function init() {
     document.getElementById("navigator-toolbox")
       ?.addEventListener("wheel", onToolboxWheel, { capture: true, passive: false });
 
-    window.addEventListener("wheel", probe("winWheel"), { capture: true, passive: true });
-    window.addEventListener("DOMMouseScroll", probe("winLegacy"), { capture: true, passive: true });
-
-    document.addEventListener("popupshown", (e) => {
-      if (e.target.tagName !== "menupopup") return;
-      openMenus.add(e.target);
-      e.target.addEventListener("wheel", probe("popup"), { capture: true, passive: true });
-      e.target.addEventListener("DOMMouseScroll", probe("popupLegacy"), { capture: true, passive: true });
-      log("menu opened");
-    }, true);
-
-    document.addEventListener("popuphidden", (e) => {
-      if (openMenus.delete(e.target)) log("menu closed");
-    }, true);
-
-    log("ready");
+    window.addEventListener("unload", () => {
+      document.getElementById("navigator-toolbox")
+        ?.removeEventListener("wheel", onToolboxWheel, true);
+    }, { once: true });
   }
 
   if (document.readyState === "complete") init();
