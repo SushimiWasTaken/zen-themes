@@ -38,7 +38,6 @@
 
     // --- Pin button ---
     const target = document.querySelector(".zen-workspace-tabs-section");
-    );
 
     let button = null;
     if (target && !document.getElementById("ccs-pin-toggle")) {
