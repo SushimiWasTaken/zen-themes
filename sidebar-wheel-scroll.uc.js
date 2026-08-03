@@ -5,6 +5,7 @@
 
 (function () {
   const TAB_LIST_WINS_WHEN_OVERFLOWING = true;
+  const EDGE_INSET = 2;   // px inside the content edge we clamp to
   const DEBUG = true;
 
   let badge = null;
@@ -22,8 +23,6 @@
     badge.textContent = msg;
   }
 
-  // Walk up from the event target looking for a chrome element that can
-  // actually scroll — if one exists we leave the event alone.
   function scrollableAncestor(node) {
     for (let el = node; el && el.nodeType === 1; el = el.parentNode) {
       if (el.scrollHeight > el.clientHeight + 1) {
@@ -33,6 +32,8 @@
     }
     return null;
   }
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   function onWheel(e) {
     const browser = gBrowser?.selectedBrowser;
@@ -49,21 +50,25 @@
     e.preventDefault();
     e.stopPropagation();
 
+    // Project the real cursor position onto the nearest point inside the
+    // content area — i.e. where the pointer would be if the sidebar
+    // weren't occupying that space. Keeps the cursor's y exactly, and
+    // works for a left- or right-hand sidebar without special-casing.
     const r = browser.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
+    const x = clamp(e.clientX, r.left + EDGE_INSET, r.right - EDGE_INSET);
+    const y = clamp(e.clientY, r.top + EDGE_INSET, r.bottom - EDGE_INSET);
 
     try {
       window.windowUtils.sendWheelEvent(
         x, y,
         e.deltaX, e.deltaY, e.deltaZ,
         e.deltaMode,
-        0,                              // modifiers
-        Math.round(e.deltaX),           // lineOrPageDeltaX
-        Math.round(e.deltaY),           // lineOrPageDeltaY
-        0                               // options
+        0,
+        Math.round(e.deltaX),
+        Math.round(e.deltaY),
+        0
       );
-      log(`forwarded: yes\ndeltaY:    ${Math.round(e.deltaY)}\nmode:      ${e.deltaMode}\nat:        ${Math.round(x)},${Math.round(y)}`);
+      log(`forwarded: yes\ndeltaY:    ${Math.round(e.deltaY)}\ncursor:    ${Math.round(e.clientX)},${Math.round(e.clientY)}\naimed at:  ${Math.round(x)},${Math.round(y)}`);
     } catch (err) {
       log(`forwarded: FAILED\nerror:     ${err}`);
     }
