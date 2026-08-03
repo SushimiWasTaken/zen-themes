@@ -1,89 +1,114 @@
 // ==UserScript==
-// @name           Autoscroll direction cursor (DEBUG 2)
-// @description    Distinct test cursors + multiple apply targets
+// @name           Autoscroll direction cursor
+// @description    Up/down cursor while autoscrolling
 // ==/UserScript==
 
 (function () {
+  const MODE = "panel";        // "panel" (A) or "overlay" (B)
   const DEAD_ZONE = 10;
+  const DEBUG = true;
 
-  // Deliberately unmistakable while testing:
-  const CURSOR_UP   = "crosshair";
-  const CURSOR_DOWN = "wait";
-  const CURSOR_DEAD = "help";
+  const UP = "crosshair", DOWN = "wait", DEAD = "help";  // test glyphs
 
-  let panel = null, anchorY = 0, moveCount = 0, lastDy = 0, applied = "-";
-  let badge = null;
+  let panel = null, anchorY = 0, lastDy = 0, badge = null, arrow = null;
+  let saved = null;
 
-  function targets() {
-    return [
-      document.documentElement,
-      panel,
-      document.getElementById("tabbrowser-tabpanels"),
-      document.getElementById("browser"),
-      gBrowser?.selectedBrowser,
-      gBrowser?.selectedBrowser?.closest(".browserStack"),
-    ].filter(Boolean);
-  }
-
-  function makeBadge() {
-    badge = document.createElement("div");
-    badge.style.cssText = [
-      "position:fixed","top:8px","left:8px","z-index:2147483647",
-      "background:rgba(0,0,0,.8)","color:#0f0","font:12px monospace",
-      "padding:6px 8px","border-radius:6px","pointer-events:none","white-space:pre",
-    ].join(";");
-    document.documentElement.appendChild(badge);
-    render();
-  }
-
-  function render() {
-    if (!badge) return;
-    badge.textContent =
-      `panel:   ${panel ? "OPEN" : "closed"}\n` +
-      `moves:   ${moveCount}\n` +
-      `dy:      ${lastDy}\n` +
-      `applied: ${applied}\n` +
-      `targets: ${targets().length}`;
-  }
-
-  function setCursor(value) {
-    applied = value || "-";
-    for (const t of targets()) {
-      if (value) t.style.setProperty("cursor", value, "important");
-      else t.style.removeProperty("cursor");
+  function log(msg) {
+    if (!DEBUG) return;
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.style.cssText =
+        "position:fixed;top:8px;left:8px;z-index:2147483647;background:rgba(0,0,0,.8);" +
+        "color:#0f0;font:12px monospace;padding:6px 8px;border-radius:6px;" +
+        "pointer-events:none;white-space:pre";
+      document.documentElement.appendChild(badge);
     }
+    badge.textContent = msg;
   }
 
+  function dirOf(dy) {
+    return dy < -DEAD_ZONE ? "up" : dy > DEAD_ZONE ? "down" : "dead";
+  }
+
+  // ---------- Mode A: cover the window with the autoscroller panel ----------
+  function expandPanel() {
+    saved = {
+      minWidth: panel.style.minWidth,
+      minHeight: panel.style.minHeight,
+      background: panel.style.background,
+    };
+    panel.style.setProperty("min-width", window.outerWidth + "px", "important");
+    panel.style.setProperty("min-height", window.outerHeight + "px", "important");
+    panel.style.setProperty("background", "transparent", "important");
+    panel.style.setProperty("--autoscroll-background-image", "none", "important");
+    try { panel.moveTo(window.screenX, window.screenY); } catch (e) { log("moveTo failed: " + e); }
+  }
+
+  function restorePanel() {
+    if (!saved) return;
+    panel.style.minWidth = saved.minWidth;
+    panel.style.minHeight = saved.minHeight;
+    panel.style.background = saved.background;
+    panel.style.removeProperty("--autoscroll-background-image");
+    saved = null;
+  }
+
+  // ---------- Mode B: our own arrow drawn over content ----------
+  function stack() {
+    return gBrowser?.selectedBrowser?.closest(".browserStack");
+  }
+
+  function makeArrow() {
+    const host = stack();
+    if (!host) return;
+    arrow = document.createElement("div");
+    arrow.style.cssText =
+      "position:absolute;z-index:2147483647;pointer-events:none;font:20px monospace;" +
+      "color:light-dark(black,white);text-shadow:0 0 3px light-dark(white,black);" +
+      "transform:translate(-50%,-50%)";
+    host.appendChild(arrow);
+  }
+
+  function moveArrow(e, dir) {
+    if (!arrow) return;
+    const r = stack()?.getBoundingClientRect();
+    if (!r) return;
+    arrow.style.left = e.clientX - r.left + "px";
+    arrow.style.top = e.clientY - r.top + "px";
+    arrow.textContent = dir === "up" ? "▲" : dir === "down" ? "▼" : "▲▼";
+  }
+
+  // ---------- shared ----------
   function onMove(e) {
-    moveCount++;
     lastDy = e.screenY - anchorY;
-    setCursor(
-      lastDy < -DEAD_ZONE ? CURSOR_UP :
-      lastDy >  DEAD_ZONE ? CURSOR_DOWN : CURSOR_DEAD
-    );
-    render();
+    const dir = dirOf(lastDy);
+    if (MODE === "panel") {
+      const c = dir === "up" ? UP : dir === "down" ? DOWN : DEAD;
+      panel?.style.setProperty("cursor", c, "important");
+    } else {
+      moveArrow(e, dir);
+    }
+    log(`mode: ${MODE}\ndy:   ${lastDy}\ndir:  ${dir}`);
   }
 
   function attach(p) {
     if (panel) return;
     panel = p;
-    moveCount = 0; lastDy = 0;
     anchorY = p.screenY + p.getBoundingClientRect().height / 2;
-    setCursor(CURSOR_DEAD);
+    if (MODE === "panel") expandPanel();
+    else makeArrow();
     window.addEventListener("mousemove", onMove, true);
-    render();
   }
 
   function detach() {
     if (!panel) return;
     window.removeEventListener("mousemove", onMove, true);
-    setCursor("");
+    if (MODE === "panel") { panel.style.removeProperty("cursor"); restorePanel(); }
+    else { arrow?.remove(); arrow = null; }
     panel = null;
-    render();
   }
 
   function init() {
-    makeBadge();
     document.addEventListener("popupshown", (e) => {
       if (e.target.id === "autoscroller") attach(e.target);
     }, true);
