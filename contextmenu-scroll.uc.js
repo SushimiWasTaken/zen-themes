@@ -60,11 +60,25 @@
 
   function init() {
     document.addEventListener("popupshown", (e) => {
-      if (!isTarget(e.target)) return;
-      open.add(e.target);
-      if (open.size === 1) addGuards();
-      log("menu opened");
-    }, true);
+  if (!isTarget(e.target)) return;
+  open.add(e.target);
+
+  const mm = gBrowser.selectedBrowser.messageManager;
+  mm.addMessageListener("ccs:scrolled", function onScrolled() {
+    mm.removeMessageListener("ccs:scrolled", onScrolled);
+    closeAll();
+  });
+  mm.loadFrameScript(
+    "data:application/javascript," + encodeURIComponent(`
+      addEventListener("scroll", () => sendAsyncMessage("ccs:scrolled"), {
+        capture: true, passive: true, once: true
+      });
+    `),
+    false
+  );
+
+  log("menu opened");
+}, true);
 
     document.addEventListener("popuphidden", (e) => {
       if (!open.delete(e.target)) return;
