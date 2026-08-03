@@ -34,7 +34,9 @@
     };
 
     const release = () => {
+      console.log("release fired, zen-user-show before:", toolbox.getAttribute("zen-user-show"));
       toolbox.removeAttribute("zen-user-show");
+      console.log("release done, zen-user-show after:", toolbox.getAttribute("zen-user-show"));
     };
 
     let pendingRelease = false;
