@@ -4,7 +4,7 @@
 // ==/UserScript==
 
 (function () {
-  const MODE = "panel";        // "panel" (A) or "overlay" (B)
+  const MODE = "overlay";        // "panel" (A) or "overlay" (B)
   const DEAD_ZONE = 10;
   const DEBUG = true;
 
