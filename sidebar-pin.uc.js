@@ -30,8 +30,10 @@
     };
 
     const release = () => {
-      toolbox.removeAttribute("zen-has-hover");
       toolbox.removeAttribute("zen-user-show");
+      if (!toolbox.matches(":hover")) {
+        toolbox.removeAttribute("zen-has-hover");
+      }
     };
 
     let button = null;
