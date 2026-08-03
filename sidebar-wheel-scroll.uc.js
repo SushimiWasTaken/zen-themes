@@ -1,20 +1,20 @@
 // ==UserScript==
 // @name           Sidebar wheel scrolls page
-// @description    Wheel over the sidebar (or with a menu open) scrolls the page
+// @description    Wheel over the sidebar scrolls the page (+ menu-open probe)
 // ==/UserScript==
 
 (function () {
   const TAB_LIST_WINS_WHEN_OVERFLOWING = true;
-  const SCROLL_WITH_MENU_OPEN = true;
-  const CLOSE_MENU_ON_SCROLL = false;  // flip if the menu hanging around looks wrong
   const EDGE_INSET = 2;
   const DEBUG = true;
 
   const openMenus = new Set();
-  let seen = 0, forwarded = 0, badge = null;
+  const hits = { wheel: 0, legacy: 0, onPopup: 0, onPopupLegacy: 0 };
+  let badge = null, lastLine = "-";
 
   function log(extra) {
     if (!DEBUG) return;
+    if (extra !== undefined) lastLine = extra;
     if (!badge) {
       badge = document.createElement("div");
       badge.style.cssText =
@@ -24,9 +24,12 @@
       document.documentElement.appendChild(badge);
     }
     badge.textContent =
-      `menus open: ${openMenus.size}\n` +
-      `wheel seen: ${seen}\n` +
-      `forwarded:  ${forwarded}\n` + extra;
+      `menus open:   ${openMenus.size}\n` +
+      `win wheel:    ${hits.wheel}\n` +
+      `win legacy:   ${hits.legacy}\n` +
+      `popup wheel:  ${hits.onPopup}\n` +
+      `popup legacy: ${hits.onPopupLegacy}\n` +
+      `${lastLine}`;
   }
 
   function scrollableAncestor(node) {
@@ -57,56 +60,49 @@
         x, y, e.deltaX, e.deltaY, e.deltaZ, e.deltaMode, 0,
         Math.round(e.deltaX), Math.round(e.deltaY), 0
       );
-      forwarded++;
-      log(`reason:     ${reason}\naimed at:   ${Math.round(x)},${Math.round(y)}`);
+      log(`${reason} -> ${Math.round(x)},${Math.round(y)}`);
     } catch (err) {
-      log(`reason:     ${reason}\nERROR:      ${err}`);
+      log(`ERROR: ${err}`);
     }
   }
 
-  function onWheel(e) {
-    seen++;
+  // --- sidebar: listener lives ON the toolbox, so no closest() test needed ---
+  function onToolboxWheel(e) {
     const target = e.composedTarget || e.target;
-
-    // Pointer over an open menu: let the menu scroll itself.
-    if (target?.closest?.("menupopup, panel")) {
-      log(`reason:     over menu (ignored)`);
+    if (TAB_LIST_WINS_WHEN_OVERFLOWING && scrollableAncestor(target)) {
+      log("tab list scrollable (ignored)");
       return;
     }
+    forward(e, "sidebar");
+  }
 
-    if (SCROLL_WITH_MENU_OPEN && openMenus.size) {
-      if (CLOSE_MENU_ON_SCROLL) {
-        for (const m of [...openMenus]) m.hidePopup();
-        log(`reason:     menu closed on scroll`);
-        return;   // let the native scroll happen once the menu is gone
-      }
-      forward(e, "menu open");
-      return;
-    }
-
-    // Pointer over the sidebar / toolbox.
-    if (target?.closest?.("#navigator-toolbox")) {
-      if (TAB_LIST_WINS_WHEN_OVERFLOWING && scrollableAncestor(target)) {
-        log(`reason:     tab list scrollable (ignored)`);
-        return;
-      }
-      forward(e, "sidebar");
-    }
+  // --- probe: is anything dispatched anywhere while a menu is open? ---
+  function probe(kind) {
+    return () => { hits[kind]++; log(); };
   }
 
   function init() {
+    const toolbox = document.getElementById("navigator-toolbox");
+    if (toolbox) {
+      toolbox.addEventListener("wheel", onToolboxWheel, { capture: true, passive: false });
+    }
+
+    window.addEventListener("wheel", probe("wheel"), { capture: true, passive: true });
+    window.addEventListener("DOMMouseScroll", probe("legacy"), { capture: true, passive: true });
+
     document.addEventListener("popupshown", (e) => {
-      if (e.target.tagName === "menupopup") { openMenus.add(e.target); log("reason:     -"); }
+      if (e.target.tagName !== "menupopup") return;
+      openMenus.add(e.target);
+      e.target.addEventListener("wheel", probe("onPopup"), { capture: true, passive: true });
+      e.target.addEventListener("DOMMouseScroll", probe("onPopupLegacy"), { capture: true, passive: true });
+      log("menu opened");
     }, true);
 
     document.addEventListener("popuphidden", (e) => {
-      if (openMenus.delete(e.target)) log("reason:     -");
+      if (openMenus.delete(e.target)) log("menu closed");
     }, true);
 
-    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
-    window.addEventListener("unload", () => {
-      window.removeEventListener("wheel", onWheel, { capture: true });
-    }, { once: true });
+    log("ready");
   }
 
   if (document.readyState === "complete") init();
