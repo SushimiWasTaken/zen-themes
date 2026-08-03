@@ -6,7 +6,7 @@
 (function () {
   const TAB_LIST_WINS_WHEN_OVERFLOWING = true;
   const EDGE_INSET = 4;
-  const DEBUG = true;
+  const DEBUG = false;
 
   const openMenus = new Set();
   const hits = { toolbox: 0, sent: 0, winWheel: 0, winLegacy: 0, popup: 0, popupLegacy: 0 };
