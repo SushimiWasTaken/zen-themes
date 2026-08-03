@@ -25,6 +25,7 @@
 
     const keepShown = () => {
       if (!isPinned()) return;
+      console.log("keepShown fired");
       if (toolbox.getAttribute("zen-has-hover") !== "true") {
         toolbox.setAttribute("zen-has-hover", "true");
       }
@@ -34,6 +35,7 @@
     };
 
     const release = () => {
+      console.log("release fired");
       toolbox.removeAttribute("zen-user-show");
       toolbox.removeAttribute("zen-has-hover");
     };
@@ -43,6 +45,7 @@
       // alone — removing zen-user-show now makes Zen play its collapse
       // animation and then immediately re-show (the bounce). Defer the
       // release until the mouse actually leaves.
+      console.log("releaseWhenSafe, hovering:", toolbox.matches(":hover"));
       if (toolbox.matches(":hover")) {
         toolbox.addEventListener(
           "mouseleave",
