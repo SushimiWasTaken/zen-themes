@@ -6,5 +6,10 @@
   "readme": "https://raw.githubusercontent.com/SushimiWasTaken/zen-themes/main/readme.md",
   "preferences": "https://raw.githubusercontent.com/SushimiWasTaken/zen-themes/main/preferences.json",
   "version": "1.0.0",
-  "fork": ["zen"]
+  "fork": ["zen"],
+  "scripts": {
+    "sidebar-pin.uc.js": {
+      "include": ["chrome://browser/content/browser.xhtml"]
+    }
+  }
 }
